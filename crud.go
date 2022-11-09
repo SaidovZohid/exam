@@ -48,10 +48,7 @@ func NewDBManager(db *sql.DB) *DBManager {
 func (d *DBManager) CreateAvtomobile(c *Car) (int, error) {
 	tx, err := d.db.Begin()
 	if err != nil {
-		err = tx.Rollback()
-		if err != nil {
-			return 0, err
-		}
+		tx.Rollback()
 		return 0, err
 	}
 	query := `
@@ -65,7 +62,7 @@ func (d *DBManager) CreateAvtomobile(c *Car) (int, error) {
 		) VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING id
 	`
-	row := d.db.QueryRow(
+	row := tx.QueryRow(
 		query,
 		c.Name,
 		c.Model,
@@ -78,11 +75,8 @@ func (d *DBManager) CreateAvtomobile(c *Car) (int, error) {
 	err = row.Scan(
 		&car_id,
 	)
-	if err != nil {
-		err = tx.Rollback()
-		if err != nil {
-			return 0, err
-		}
+	if err != nil { 
+		tx.Rollback()
 		return 0, err
 	}
 	queryInsertImage := `
@@ -93,24 +87,18 @@ func (d *DBManager) CreateAvtomobile(c *Car) (int, error) {
 		) VALUES ($1, $2, $3)
 	`
 	for _, v := range c.Images {
-		_, err := d.db.Exec(
+		_, err := tx.Exec(
 			queryInsertImage,
 			car_id,
 			v.Sequence_number,
 			v.Image_url,
 		)
 		if err != nil {
-			err = tx.Rollback()
-			if err != nil {
-				return 0, err
-			}
+			tx.Rollback()
 			return 0, err
 		}
 	}
-	err = tx.Commit()
-	if err != nil {
-		return 0, err
-	}
+	tx.Commit()
 	return car_id, nil
 }
 
@@ -174,10 +162,7 @@ func (d *DBManager) UpdateCar(c *Car) error {
 	tx, err := d.db.Begin()
 
 	if err != nil {
-		errtx := tx.Rollback()
-		if errtx != nil {
-			return errtx
-		}
+		tx.Rollback()
 		return err
 	}
 
@@ -192,7 +177,7 @@ func (d *DBManager) UpdateCar(c *Car) error {
 		WHERE id = $7 
 	`
 
-	row, err := d.db.Exec(
+	row, err := tx.Exec(
 		queryUpdateCar,
 		c.Name,
 		c.Model,
@@ -204,28 +189,19 @@ func (d *DBManager) UpdateCar(c *Car) error {
 	)
 
 	if err != nil {
-		errtx := tx.Rollback()
-		if errtx != nil {
-			return errtx
-		}
+		tx.Rollback()
 		return err
 	}
 
 	resCount, err := row.RowsAffected()
 
 	if err != nil {
-		errtx := tx.Rollback()
-		if errtx != nil {
-			return errtx
-		}
+		tx.Rollback()
 		return err
 	}
 
 	if resCount == 0 {
-		errtx := tx.Rollback()
-		if errtx != nil {
-			return errtx
-		}
+		tx.Rollback()
 		return sql.ErrNoRows
 	}
 
@@ -233,12 +209,9 @@ func (d *DBManager) UpdateCar(c *Car) error {
 		DELETE FROM images WHERE car_id = $1
 	`
 
-	_, err = d.db.Exec(queryDeleteImages, c.Id)
+	_, err = tx.Exec(queryDeleteImages, c.Id)
 	if err != nil {
-		errtx := tx.Rollback()
-		if errtx != nil {
-			return errtx
-		}
+		tx.Rollback()
 		return err
 	}
 
@@ -251,32 +224,23 @@ func (d *DBManager) UpdateCar(c *Car) error {
 	`
 
 	for _, v := range c.Images {
-		_, err = d.db.Exec(
+		_, err = tx.Exec(
 			queryInsertImage,
 			c.Id,
 			v.Sequence_number,
 			v.Image_url,
 		)
 		if err != nil {
-			errtx := tx.Rollback()
-			if errtx != nil {
-				return errtx
-			}
+			tx.Rollback()
 			return err
 		}
 	}
 
 	if err != nil {
-		errtx := tx.Rollback()
-		if errtx != nil {
-			return errtx
-		}
+		tx.Rollback()
 		return err
 	}
-	errtx := tx.Commit()
-	if errtx != nil {
-		return errtx
-	}
+	tx.Commit()
 	return nil
 }
 
